@@ -2,6 +2,8 @@
 
 [![Hugging Face QA Model](https://img.shields.io/badge/HuggingFace-Model%20Weights-blue)](https://huggingface.co/detker/roberta-qa-125M)
 
+![](imgs/roberta_qa_highlevel.png)
+
 ## 📋 Table of Contents
 
 - [Introduction](#introduction)
