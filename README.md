@@ -1,5 +1,7 @@
 # RoBERTa for MLM and Question Answering
 
+[![Hugging Face QA Model](https://img.shields.io/badge/HuggingFace-Model%20Weights-blue)](https://huggingface.co/detker/roberta-qa-125M)
+
 ## 📋 Table of Contents
 
 - [Introduction](#introduction)
@@ -33,6 +35,11 @@ This repository implements a RoBERTa-based model fine-tuned with LoRA (Low-Rank 
 │   └── qa_experiment_name/
 │       └── checkpoints/
 ```
+
+### 📦 Model Weights
+Pretrained model weights are available on Hugging Face: [RoBERTa QA + LoRA](https://huggingface.co/detker/roberta-qa-125M)
+
+You can load the model using Hugging Face's `AutoModel` and `AutoConfig` classes:
 
 ## ⚙️ Setup
 
