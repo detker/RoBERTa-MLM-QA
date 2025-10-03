@@ -8,7 +8,6 @@ train_test_split_ratio = 0.005 # ratio of test samples
 context_length = 512
 path_to_data_storage = 'data/roberta_data'
 huggingface_cache_dir = 'data/huggingface_cache'
-seed = 42
 n_workers = 32
 huggingface_model = 'FacebookAI/roberta-base'
 
@@ -36,7 +35,6 @@ clean_dataset = dataset.map(
     remove_columns='text'
 )
 
-
 def group(batch):
     concat_sents = []
     for sent in batch['input_ids']:
@@ -55,4 +53,3 @@ tokens = clean_dataset.map(
 )
 
 tokens.save_to_disk(path_to_data_storage)
-

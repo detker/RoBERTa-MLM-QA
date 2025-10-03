@@ -1,5 +1,6 @@
 import sys
-sys.path.append('../')
+import os
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 from typing import Literal
 from transformers import PretrainedConfig, PreTrainedModel
@@ -57,4 +58,4 @@ class RobertaForQAHF(PreTrainedModel):
         self.model = RobertaForQA(config)
 
     def forward(self, x):
-        return self.model(x)
+        return self.model(**x)

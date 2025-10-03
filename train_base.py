@@ -15,239 +15,240 @@ from accelerate import Accelerator
 from src.utils import RobertaConfig, RobertaMaskedLMCollateFun
 from src.model import RoBERTaForMLM
 
-def add_arguments(parser: argparse.ArgumentParser) -> None:
+
+def add_arguments(parser: argparse.ArgumentParser):
     parser.add_argument(
-        "--experiment_name",
+        '--experiment_name',
         required=True,
         type=str
     )
 
     parser.add_argument(
-        "--working_directory",
+        '--working_directory',
         required=True,
         type=str
     )
 
     parser.add_argument(
-        "--hf_model_name",
-        help="Huggingface model name we want to use for the tokenizer",
-        default="FacebookAI/roberta-base",
+        '--hf_model_name',
+        help='Huggingface model name we want to use for the tokenizer',
+        default='FacebookAI/roberta-base',
         type=str
     )
 
     parser.add_argument(
-        "--path_to_prepared_data",
+        '--path_to_prepared_data',
         required=True,
         type=str
     )
 
     parser.add_argument(
-        "--context_length",
-        help="Max sequence length we want the model to accept",
+        '--context_length',
+        help='Max sequence length we want the model to accept',
         default=512,
         type=int
     )
 
     parser.add_argument(
-        "--masking_probability",
-        help="Probability of token to be selected to be masked",
+        '--masking_probability',
+        help='Probability of token to be selected to be masked',
         default=0.15,
         type=float
     )
 
     parser.add_argument(
-        "--num_workers",
-        help="Number of workers for dataloading",
+        '--num_workers',
+        help='Number of workers for dataloading',
         default=24,
         type=int
     )
 
     parser.add_argument(
-        "--hidden_dropout_p",
-        help="Dropout probability on all linear layers",
+        '--hidden_dropout_p',
+        help='Dropout probability on all linear layers',
         default=0.1,
         type=float
     )
 
     parser.add_argument(
-        "--attention_dropout_p",
-        help="Dropout probability on attention matrix",
+        '--attention_dropout_p',
+        help='Dropout probability on attention matrix',
         default=0.1,
         type=float
     )
 
     parser.add_argument(
-        "--num_transformer_blocks",
-        help="Number of transformer blocks in model",
+        '--num_transformer_blocks',
+        help='Number of transformer blocks in model',
         default=12,
         type=int
     )
 
     parser.add_argument(
-        "--num_attention_heads",
-        help="Number of heads of attention",
+        '--num_attention_heads',
+        help='Number of heads of attention',
         default=12,
         type=int
     )
 
     parser.add_argument(
-        "--embedding_dimension",
-        help="Transformer embedding dimension",
+        '--embedding_dimension',
+        help='Transformer embedding dimension',
         default=768,
         type=int
     )
 
     parser.add_argument(
-        "--mlp_ratio",
-        help="Hidden layer expansion factor for feed forward layers",
+        '--mlp_ratio',
+        help='Hidden layer expansion factor for feed forward layers',
         default=4,
         type=int
     )
 
     parser.add_argument(
-        "--layer_norm_eps",
-        help="error added to layer norm to avoid divide by zero",
+        '--layer_norm_eps',
+        help='error added to layer norm to avoid divide by zero',
         default=1e-5,
         type=float
     )
 
     parser.add_argument(
-        "--initializer_range",
-        help="Standard deviation of linear layers initialized as normal distribution",
+        '--initializer_range',
+        help='Standard deviation of linear layers initialized as normal distribution',
         default=0.02,
         type=float
     )
 
     parser.add_argument(
-        "--per_gpu_batch_size",
-        help="Overall batch size per gpu during training",
+        '--per_gpu_batch_size',
+        help='Overall batch size per gpu during training',
         default=128,
         type=int
     )
 
     parser.add_argument(
-        "--gradient_accumulation_steps",
-        help="Splits per_gpu_batch_size by gradient_accumulation_steps",
+        '--gradient_accumulation_steps',
+        help='Splits per_gpu_batch_size by gradient_accumulation_steps',
         default=4,
         type=int
     )
 
     parser.add_argument(
-        "--num_training_steps",
-        help="Number of training steps to take",
+        '--num_training_steps',
+        help='Number of training steps to take',
         default=250000,
         type=int
     )
 
     parser.add_argument(
-        "--max_grad_norm",
-        help="Max gradient norm used for stabilizing training with gradient clipping",
+        '--max_grad_norm',
+        help='Max gradient norm used for stabilizing training with gradient clipping',
         default=1.0,
         type=float
     )
 
     parser.add_argument(
-        "--num_warmup_steps",
+        '--num_warmup_steps',
         type=int,
         default=20000,
-        help="Number of steps for the warmup in the lr scheduler."
+        help='Number of steps for the warmup in the lr scheduler.'
     )
 
     parser.add_argument(
-        "--lr_scheduler_type",
+        '--lr_scheduler_type',
         type=str,
-        default="linear",
-        help="The scheduler type to use.",
-        choices=["linear", "cosine", "cosine_with_restarts", "polynomial", "constant", "constant_with_warmup"],
+        default='linear',
+        help='The scheduler type to use.',
+        choices=['linear', 'cosine', 'cosine_with_restarts', 'polynomial', 'constant', 'constant_with_warmup'],
     )
 
     parser.add_argument(
-        "--logging_steps",
-        help="Number of iterations for every log of metrics to wandb",
+        '--logging_steps',
+        help='Number of iterations for every log of metrics to wandb',
         default=1,
         type=int
     )
 
     parser.add_argument(
-        "--evaluation_interval",
-        help="Number of iterations for every evaluation and plotting",
+        '--evaluation_interval',
+        help='Number of iterations for every evaluation and plotting',
         default=2500,
         type=int
     )
 
     parser.add_argument(
-        "--checkpoint_interval",
-        help="Number of iterations for checkpointing",
+        '--checkpoint_interval',
+        help='Number of iterations for checkpointing',
         default=2500,
         type=int
     )
 
     parser.add_argument(
-        "--learning_rate",
-        help="Max learning rate for all Learning Rate Schedulers",
+        '--learning_rate',
+        help='Max learning rate for all Learning Rate Schedulers',
         default=6e-4,
         type=float
     )
 
     parser.add_argument(
-        "--bias_weight_decay",
-        help="Apply weight decay to bias",
+        '--bias_weight_decay',
+        help='Apply weight decay to bias',
         default=False,
         action=argparse.BooleanOptionalAction
     )
 
     parser.add_argument(
-        "--norm_weight_decay",
-        help="Apply weight decay to normalization weight and bias",
+        '--norm_weight_decay',
+        help='Apply weight decay to normalization weight and bias',
         default=False,
         action=argparse.BooleanOptionalAction
     )
 
     parser.add_argument(
-        "--weight_decay",
-        help="Weight decay constant for AdamW optimizer",
+        '--weight_decay',
+        help='Weight decay constant for AdamW optimizer',
         default=0.01,
         type=float
     )
 
     parser.add_argument(
-        "--adam_beta1",
+        '--adam_beta1',
         type=float,
         default=0.9,
-        help="Beta1 for AdamW optimizer",
+        help='Beta1 for AdamW optimizer',
     )
 
     parser.add_argument(
-        "--adam_beta2",
+        '--adam_beta2',
         type=float,
         default=0.98,
-        help="Beta2 for AdamW optimizer",
+        help='Beta2 for AdamW optimizer',
     )
 
     parser.add_argument(
-        "--adam_epsilon",
+        '--adam_epsilon',
         type=float,
         default=1e-6,
-        help="Epsilon for AdamW optimizer",
+        help='Epsilon for AdamW optimizer',
     )
 
     parser.add_argument(
-        "--num_keep_checkpoints",
-        help="Number of Checkpoints to Keep, if None, all checkpoints will be saved",
+        '--num_keep_checkpoints',
+        help='Number of Checkpoints to Keep, if None, all checkpoints will be saved',
         default=None,
         type=int
     )
 
     parser.add_argument(
-        "--resume_from_checkpoint",
-        help="Checkpoint folder for model to resume training from, inside the experiment folder",
+        '--resume_from_checkpoint',
+        help='Checkpoint folder for model to resume training from, inside the experiment folder',
         default=None,
         type=str
     )
 
     parser.add_argument(
-        "--wandb",
-        help="Flag to enable logging to wandb",
+        '--wandb',
+        help='Flag to enable logging to wandb',
         default=False,
         action=argparse.BooleanOptionalAction
     )

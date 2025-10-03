@@ -1,16 +1,55 @@
-import torch
-import numpy as np
-from tqdm import tqdm
-from typing import Literal
-from transformers import RobertaTokenizerFast
-from dataclasses import dataclass, asdict
-from torch.utils.data import DataLoader
-from datasets import load_from_disk
 import random
+from typing import Literal
+from dataclasses import dataclass, asdict
 
-# hf typical config prep
+import numpy as np
+
+import torch
+from transformers import RobertaTokenizerFast
+
+
 @dataclass
 class RobertaConfig:
+    """
+    Configuration class for the RoBERTa model.
+
+    :param vocab_size: Size of the vocabulary.
+    :type vocab_size: int
+    :param start_token: Token ID for the start token.
+    :type start_token: int
+    :param end_token: Token ID for the end token.
+    :type end_token: int
+    :param pad_token: Token ID for the padding token.
+    :type pad_token: int
+    :param mask_token: Token ID for the mask token.
+    :type mask_token: int
+    :param embd_dim: Dimension of the embeddings.
+    :type embd_dim: int
+    :param n_transformer_blocks: Number of transformer blocks.
+    :type n_transformer_blocks: int
+    :param n_heads: Number of attention heads.
+    :type n_heads: int
+    :param mlp_ratio: Ratio for the feed-forward layer expansion.
+    :type mlp_ratio: int
+    :param layer_norm_eps: Epsilon value for layer normalization.
+    :type layer_norm_eps: float
+    :param hidden_drop_p: Dropout probability for hidden layers.
+    :type hidden_drop_p: float
+    :param att_drop_p: Dropout probability for attention layers.
+    :type att_drop_p: float
+    :param context_length: Maximum context length.
+    :type context_length: int
+    :param masking_prob: Probability of masking tokens.
+    :type masking_prob: float
+    :param hf_model_name: Name of the Hugging Face model.
+    :type hf_model_name: str
+    :param pretrained_backbone: Type of pretrained backbone to use.
+    :type pretrained_backbone: Literal['pretrained', 'pretrained_huggingface', 'random']
+    :param path_to_pretrained_model: Path to the pretrained model.
+    :type path_to_pretrained_model: str
+    :param gradient_checkpointing: Whether to enable gradient checkpointing.
+    :type gradient_checkpointing: bool
+    """
     vocab_size: int = 50265
     start_token: int = 0
     end_token: int = 2
@@ -37,6 +76,24 @@ class RobertaConfig:
         return asdict(self)
 
 def mask_tokens(tokens, special_tokens_mask, vocab_size, special_ids, masking_prob, mask_token):
+    """
+    Masks tokens for masked language modeling.
+
+    :param tokens: Input tensor of token IDs.
+    :type tokens: torch.Tensor
+    :param special_tokens_mask: Mask indicating special tokens.
+    :type special_tokens_mask: torch.Tensor
+    :param vocab_size: Size of the vocabulary.
+    :type vocab_size: int
+    :param special_ids: List of special token IDs.
+    :type special_ids: list
+    :param masking_prob: Probability of masking tokens.
+    :type masking_prob: float
+    :param mask_token: Token ID for the mask token.
+    :type mask_token: int
+    :return: Tuple containing masked tokens and labels.
+    :rtype: tuple
+    """
     non_special_tokens = list(set(range(vocab_size)) - set(special_ids))
 
     uniform_sample = torch.rand(*tokens.shape)
@@ -57,7 +114,6 @@ def mask_tokens(tokens, special_tokens_mask, vocab_size, special_ids, masking_pr
     uniform_sample = torch.rand(len(not_chosen_idxs_to_mask))
     chosen_tokens_to_fill = (uniform_sample < 0.5)
     chosen_idxs_to_fill = not_chosen_idxs_to_mask[chosen_tokens_to_fill]
-    chosen_idxs_to_ignore = not_chosen_idxs_to_mask[~chosen_tokens_to_fill]
 
     if len(chosen_idxs_to_mask) > 0:
         tokens[chosen_idxs_to_mask[:,0], chosen_idxs_to_mask[:, 1]] = mask_token
@@ -70,6 +126,14 @@ def mask_tokens(tokens, special_tokens_mask, vocab_size, special_ids, masking_pr
 
 
 def RobertaMaskedLMCollateFun(config):
+    """
+    Creates a collate function for preparing batches of data for masked language modeling.
+
+    :param config: Configuration object containing model parameters.
+    :type config: RobertaConfig
+    :return: Collate function for DataLoader.
+    :rtype: function
+    """
     tokenizer = RobertaTokenizerFast.from_pretrained(config.hf_model_name)
 
     def _collate_fn(batch):
@@ -95,6 +159,13 @@ def RobertaMaskedLMCollateFun(config):
     return _collate_fn
 
 def QAProcessor():
+    """
+    Creates a processor for question-answering tasks. Tokenizes input questions and contexts,
+    aligns character-level answer spans to token-level indices, and prepares the data for training.
+
+    :return: Function to process question-answering datasets.
+    :rtype: function
+    """
     tokenizer = RobertaTokenizerFast.from_pretrained('FacebookAI/roberta-base')
 
     def chars2tokens(examples):

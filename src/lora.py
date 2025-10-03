@@ -4,12 +4,29 @@ from typing import Union, Optional, Literal
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import transformers
 from safetensors.torch import save_file
 
 
 @dataclass
 class LoRAConfig:
+    """
+    Configuration class for LoRA (Low-Rank Adaptation).
+
+    :param lora_target_modules: List of module names to apply LoRA or a single module name.
+    :type lora_target_modules: Optional[Union[list[str], str]]
+    :param lora_exclude_modules: List of module names to exclude from LoRA or a single module name.
+    :type lora_exclude_modules: Optional[Union[list[str], str]]
+    :param lora_bias: Type of bias handling. Options: "none", "all", "lora_only".
+    :type lora_bias: Literal["none", "all", "lora_only"]
+    :param lora_rank: Rank of the low-rank decomposition.
+    :type lora_rank: int
+    :param lora_alpha: Scaling factor for LoRA.
+    :type lora_alpha: float
+    :param lora_dropout: Dropout probability for LoRA layers.
+    :type lora_dropout: float
+    :param lora_use_rslora: Whether to use root-scaled LoRA.
+    :type lora_use_rslora: bool
+    """
     lora_target_modules: Optional[Union[list[str], str]] = None
     lora_exclude_modules: Optional[Union[list[str], str]] = None
     lora_bias: Literal["none", "all", "lora_only"] = "none"
@@ -20,6 +37,12 @@ class LoRAConfig:
 
 
 class LoRABaseLayer:
+    """
+    Base class for LoRA layers.
+
+    :param lora_config: Configuration object for LoRA.
+    :type lora_config: LoRAConfig
+    """
     def __init__(self,
                  lora_config):
         self.rank = lora_config.lora_rank
@@ -28,12 +51,30 @@ class LoRABaseLayer:
         self.scaling = lora_config.lora_alpha / (lora_config.lora_rank ** 0.5 if lora_config.lora_use_rslora else lora_config.lora_rank)
 
     def load_weights_to_lora_layer(self, state_dict):
+        """
+        Loads weights into the LoRA layer.
+
+        :param state_dict: State dictionary containing weights and biases.
+        :type state_dict: dict
+        """
         self.weight.data = state_dict['weight']
         if 'bias' in state_dict.keys():
             self.bias.data = state_dict['bias']
 
 
 class LoRALinearLayer(nn.Linear, LoRABaseLayer):
+    """
+    LoRA-enhanced Linear layer.
+
+    :param lora_config: Configuration object for LoRA.
+    :type lora_config: LoRAConfig
+    :param input_dim: Number of input features.
+    :type input_dim: int
+    :param output_dim: Number of output features.
+    :type output_dim: int
+    :param bias: Whether to include a bias term.
+    :type bias: bool
+    """
     def __init__(self,
                  lora_config,
                  input_dim,
@@ -64,9 +105,14 @@ class LoRALinearLayer(nn.Linear, LoRABaseLayer):
         return merged_linear
 
     def forward(self, x):
-        # linear_out = F.linear(x,
-        #                       weight=self.weight,
-        #                       bias=self.bias)
+        """
+        Forward pass for the LoRA-enhanced Linear layer.
+
+        :param x: Input tensor.
+        :type x: torch.Tensor
+        :return: Output tensor.
+        :rtype: torch.Tensor
+        """
         linear_out = nn.Linear.forward(self,x)
 
         self.lora_AB = (self.lora_A @ self.lora_B) * self.scaling
@@ -76,6 +122,16 @@ class LoRALinearLayer(nn.Linear, LoRABaseLayer):
 
 
 class LoRAEmbeddingLayer(nn.Embedding, LoRABaseLayer):
+    """
+    LoRA-enhanced Embedding layer.
+
+    :param lora_config: Configuration object for LoRA.
+    :type lora_config: LoRAConfig
+    :param num_embeddings: Number of embeddings.
+    :type num_embeddings: int
+    :param embedding_dim: Dimension of each embedding.
+    :type embedding_dim: int
+    """
     def __init__(self,
                  lora_config,
                  num_embeddings,
@@ -102,13 +158,14 @@ class LoRAEmbeddingLayer(nn.Embedding, LoRABaseLayer):
         return merged_embd
 
     def forward(self, x):
-        # org_embd = F.embedding(input=x,
-        #                           weight=self.weight,
-        #                           padding_idx=self.padding_idx,
-        #                           max_norm=self.max_norm,
-        #                           norm_type=self.norm_type,
-        #                           scale_grad_by_freq=self.scale_grad_by_freq,
-        #                           sparse=self.sparse)
+        """
+        Forward pass for the LoRA-enhanced Embedding layer.
+
+        :param x: Input tensor.
+        :type x: torch.Tensor
+        :return: Output tensor.
+        :rtype: torch.Tensor
+        """
         org_embd = nn.Embedding.forward(self, x)
         lora_A_embd = F.embedding(input=x,
                                   weight=self.lora_A,
@@ -124,6 +181,24 @@ class LoRAEmbeddingLayer(nn.Embedding, LoRABaseLayer):
 
 
 class LoRAConv2dLayer(nn.Conv2d, LoRABaseLayer):
+    """
+    LoRA-enhanced Conv2D layer.
+
+    :param lora_config: Configuration object for LoRA.
+    :type lora_config: LoRAConfig
+    :param in_channels: Number of input channels.
+    :type in_channels: int
+    :param out_channels: Number of output channels.
+    :type out_channels: int
+    :param kernel_size: Size of the convolutional kernel.
+    :type kernel_size: Union[int, tuple]
+    :param stride: Stride of the convolution.
+    :type stride: int
+    :param padding: Padding added to all sides of the input.
+    :type padding: int
+    :param bias: Whether to include a bias term.
+    :type bias: bool
+    """
     def __init__(self,
                  lora_config,
                  in_channels,
@@ -165,6 +240,14 @@ class LoRAConv2dLayer(nn.Conv2d, LoRABaseLayer):
         return merged_conv2d
 
     def forward(self, x):
+        """
+        Forward pass for the LoRA-enhanced Conv2D layer.
+
+        :param x: Input tensor.
+        :type x: torch.Tensor
+        :return: Output tensor.
+        :rtype: torch.Tensor
+        """
         linear_out = nn.Conv2d.forward(self,x) # (B,out_channels,H',W')
 
         lora_A_out = F.conv2d(input=x,
@@ -182,6 +265,14 @@ class LoRAConv2dLayer(nn.Conv2d, LoRABaseLayer):
 
 
 class LoRAModel(nn.Module):
+    """
+    Wrapper class for applying LoRA to a model.
+
+    :param model: The base model to which LoRA will be applied.
+    :type model: nn.Module
+    :param config: Configuration object for LoRA.
+    :type config: LoRAConfig
+    """
     def __init__(self, model, config):
         super().__init__()
         self.model = model
@@ -205,6 +296,13 @@ class LoRAModel(nn.Module):
         self.print_number_of_trainable_parameters()
 
     def forward(self, *input, **kwargs):
+        """
+        Forward pass for the LoRA-enhanced model.
+
+        :param input: Input arguments for the base model.
+        :param kwargs: Keyword arguments for the base model.
+        :return: Output of the base model.
+        """
         return self.model(*input, **kwargs)
 
     def _check_module_presence(self, module_name, array):

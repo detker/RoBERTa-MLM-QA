@@ -4,10 +4,16 @@ import torch.nn.functional as F
 from safetensors.torch import load_file
 from transformers import RobertaModel as RobertaHF
 
-import src.utils
+# import utils
 
 
 class Embedding(nn.Module):
+    """
+    Embedding layer with positional embeddings, normalization, and dropout.
+
+    :param config: Configuration object containing model parameters.
+    :type config: object
+    """
     def __init__(self, config):
         super().__init__()
         self.config = config
@@ -18,6 +24,14 @@ class Embedding(nn.Module):
 
 
     def forward(self, x):
+        """
+        Forward pass for the embedding layer.
+
+        :param x: Input tensor of shape (B, S), where B is the batch size and S is the sequence length.
+        :type x: torch.Tensor
+        :return: Output tensor of shape (B, S, E), where E is the embedding dimension.
+        :rtype: torch.Tensor
+        """
         # (B, S) -> (B, S, E)
         batch_size, seq_len = x.shape
         x = self.embd(x)
@@ -33,6 +47,12 @@ class Embedding(nn.Module):
         return x
 
 class MultiHeadSelfAttention(nn.Module):
+    """
+    Multi-head self-attention layer.
+
+    :param config: Configuration object containing model parameters.
+    :type config: object
+    """
     def __init__(self, config):
         super().__init__()
         self.config = config
@@ -46,7 +66,19 @@ class MultiHeadSelfAttention(nn.Module):
 
         self.proj_out = nn.Linear(config.embd_dim, config.embd_dim)
 
-    def forward(self, x, attention_mask=None):
+    def forward(self,
+                x,
+                attention_mask=None):
+        """
+        Forward pass for the multi-head self-attention layer.
+
+        :param x: Input tensor of shape (B, S, E), where B is the batch size, S is the sequence length, and E is the embedding dimension.
+        :type x: torch.Tensor
+        :param attention_mask: Optional attention mask of shape (B, 1, S, S).
+        :type attention_mask: torch.Tensor, optional
+        :return: Output tensor of shape (B, S, E).
+        :rtype: torch.Tensor
+        """
         batch_size, seq_len, embd_dim = x.shape
 
         # q,k,v: (B, S, E) -> (B, n_heads, S, head_dim)
@@ -72,6 +104,12 @@ class MultiHeadSelfAttention(nn.Module):
         return out
 
 class FeedForwardLayer(nn.Module):
+    """
+    Feed-forward layer with two linear transformations and dropout.
+
+    :param config: Configuration object containing model parameters.
+    :type config: object
+    """
     def __init__(self, config):
         super().__init__()
         self.config = config
@@ -82,6 +120,14 @@ class FeedForwardLayer(nn.Module):
         self.dropout2 = nn.Dropout(config.hidden_drop_p)
 
     def forward(self, x):
+        """
+        Forward pass for the feed-forward layer.
+
+        :param x: Input tensor of shape (B, S, E).
+        :type x: torch.Tensor
+        :return: Output tensor of shape (B, S, E).
+        :rtype: torch.Tensor
+        """
         x = self.linear1(x)
         x = self.activation_f(x)
         x = self.dropout1(x)
@@ -91,6 +137,12 @@ class FeedForwardLayer(nn.Module):
         return x
 
 class EncoderBlock(nn.Module):
+    """
+    Transformer encoder block with self-attention and feed-forward layers.
+
+    :param config: Configuration object containing model parameters.
+    :type config: object
+    """
     def __init__(self, config):
         super().__init__()
         self.config = config
@@ -102,7 +154,19 @@ class EncoderBlock(nn.Module):
         self.ff = FeedForwardLayer(config)
         self.norm2 = nn.LayerNorm(config.embd_dim, eps=config.layer_norm_eps)
 
-    def forward(self, x, attention_mask=None):
+    def forward(self,
+                x,
+                attention_mask=None):
+        """
+        Forward pass for the encoder block.
+
+        :param x: Input tensor of shape (B, S, E).
+        :type x: torch.Tensor
+        :param attention_mask: Optional attention mask of shape (B, 1, S, S).
+        :type attention_mask: torch.Tensor, optional
+        :return: Output tensor of shape (B, S, E).
+        :rtype: torch.Tensor
+        """
         x = x + self.dropout(self.attention(x, attention_mask))
         x = self.norm1(x)
 
@@ -112,6 +176,12 @@ class EncoderBlock(nn.Module):
         return x
 
 class RoBERTaEncoder(nn.Module):
+    """
+    RoBERTa encoder consisting of multiple transformer encoder blocks.
+
+    :param config: Configuration object containing model parameters.
+    :type config: object
+    """
     def __init__(self, config):
         super().__init__()
         self.config = config
@@ -119,7 +189,19 @@ class RoBERTaEncoder(nn.Module):
             EncoderBlock(config) for _ in range(0, config.n_transformer_blocks)
         ])
 
-    def forward(self, x, attention_mask=None):
+    def forward(self,
+                x,
+                attention_mask=None):
+        """
+        Forward pass for the RoBERTa encoder.
+
+        :param x: Input tensor of shape (B, S, E).
+        :type x: torch.Tensor
+        :param attention_mask: Optional attention mask of shape (B, S).
+        :type attention_mask: torch.Tensor, optional
+        :return: Output tensor of shape (B, S, E).
+        :rtype: torch.Tensor
+        """
         _, seq_len, _ = x.shape
         if attention_mask is not None:
             # (B, S) -> (B, 1, 1, S) -> (B, 1, S, S) ### for FlashAtttention :3
@@ -131,6 +213,12 @@ class RoBERTaEncoder(nn.Module):
         return x
 
 class HeadForMaskedLanguageModeling(nn.Module):
+    """
+    Head for masked language modeling with a linear layer, activation, normalization, and decoder.
+
+    :param config: Configuration object containing model parameters.
+    :type config: object
+    """
     def __init__(self, config):
         super().__init__()
         self.config = config
@@ -141,6 +229,14 @@ class HeadForMaskedLanguageModeling(nn.Module):
         self.decoder = nn.Linear(config.embd_dim, config.vocab_size)
 
     def forward(self, x):
+        """
+        Forward pass for the masked language modeling head.
+
+        :param x: Input tensor of shape (B, S, E).
+        :type x: torch.Tensor
+        :return: Output tensor of shape (B, S, V), where V is the vocabulary size.
+        :rtype: torch.Tensor
+        """
         x = self.linear(x)
         x = self.activation_f(x)
         x = self.norm(x)
@@ -149,6 +245,12 @@ class HeadForMaskedLanguageModeling(nn.Module):
         return x
 
 class RoBERTa(nn.Module):
+    """
+    RoBERTa model with embedding and encoder layers.
+
+    :param config: Configuration object containing model parameters.
+    :type config: object
+    """
     def __init__(self, config):
         super().__init__()
         self.config = config
@@ -156,12 +258,30 @@ class RoBERTa(nn.Module):
         self.embedding = Embedding(config)
         self.encoder = RoBERTaEncoder(config)
 
-    def forward(self, x, attention_mask=None):
+    def forward(self,
+                x,
+                attention_mask=None):
+        """
+        Forward pass for the RoBERTa model.
+
+        :param x: Input tensor of shape (B, S).
+        :type x: torch.Tensor
+        :param attention_mask: Optional attention mask of shape (B, S).
+        :type attention_mask: torch.Tensor, optional
+        :return: Output tensor of shape (B, S, E).
+        :rtype: torch.Tensor
+        """
         x = self.embedding(x)  # (B, S) -> (B, S, E)
         x = self.encoder(x, attention_mask)  # (B, S, E) -> (B, S, E)
         return x
 
 class RoBERTaForMLM(nn.Module):
+    """
+    RoBERTa model for masked language modeling.
+
+    :param config: Configuration object containing model parameters.
+    :type config: object
+    """
     def __init__(self, config):
         super().__init__()
         self.config = config
@@ -171,7 +291,22 @@ class RoBERTaForMLM(nn.Module):
 
         self.apply(init_weights)
 
-    def forward(self, input_ids, attention_mask=None, labels=None):
+    def forward(self,
+                input_ids,
+                attention_mask=None,
+                labels=None):
+        """
+        Forward pass for the RoBERTa model for masked language modeling.
+
+        :param input_ids: Input tensor of shape (B, S).
+        :type input_ids: torch.Tensor
+        :param attention_mask: Optional attention mask of shape (B, S).
+        :type attention_mask: torch.Tensor, optional
+        :param labels: Optional labels for computing the loss while executing training script.
+        :type labels: torch.Tensor, optional
+        :return: Tuple containing hidden states, logits, and optionally the loss.
+        :rtype: tuple
+        """
         batch_size, seq_len = input_ids.shape
         roberta_out_hidden = self.roberta(input_ids, attention_mask)
         logits = self.head(roberta_out_hidden)
@@ -199,6 +334,12 @@ def init_weights(module: nn.Module) -> None:
         #     module.weight.data[module.padding_idx].zero_()
 
 class RobertaForQA(nn.Module):
+    """
+    RoBERTa model for question answering.
+
+    :param config: Configuration object containing model parameters.
+    :type config: object
+    """
     def __init__(self, config):
         super().__init__()
         self.model = None
@@ -227,6 +368,20 @@ class RobertaForQA(nn.Module):
                 attention_mask=None,
                 start_pos=None,
                 end_pos=None):
+        """
+        Forward pass for the RoBERTa model for question answering.
+
+        :param input_ids: Input tensor of shape (B, S).
+        :type input_ids: torch.Tensor
+        :param attention_mask: Optional attention mask of shape (B, S).
+        :type attention_mask: torch.Tensor, optional
+        :param start_pos: Optional start positions for computing the loss.
+        :type start_pos: torch.Tensor, optional
+        :param end_pos: Optional end positions for computing the loss.
+        :type end_pos: torch.Tensor, optional
+        :return: Tuple containing start logits, end logits, and optionally the loss.
+        :rtype: tuple
+        """
         if self.config.pretrained_backbone == 'pretrained_huggingface':
             output = self.model(input_ids, attention_mask).last_hidden_state
         else:
@@ -256,16 +411,16 @@ class RobertaForQA(nn.Module):
             return start_logits, end_logits
 
 
-if __name__ == '__main__':
-    x = torch.randint(0, 1000, size=(4, 8))
-    config = utils.RobertaConfig()
-    model = RoBERTaForMLM(config)
-    hidden_states, logits = model(x)
-    print(hidden_states)
-    print(hidden_states.shape)
-    print(logits)
-    print(logits.shape)
-    test = RobertaForQA(config)
-    start_pos = torch.tensor([1,2,2,4]).unsqueeze(-1)
-    end_pos = torch.tensor([3,4,5,6]).unsqueeze(-1)
-    print(test(x, start_pos=start_pos, end_pos=end_pos))
+# if __name__ == '__main__':
+#     x = torch.randint(0, 1000, size=(4, 8))
+#     config = utils.RobertaConfig()
+#     model = RoBERTaForMLM(config)
+#     hidden_states, logits = model(x)
+#     print(hidden_states)
+#     print(hidden_states.shape)
+#     print(logits)
+#     print(logits.shape)
+#     test = RobertaForQA(config)
+#     start_pos = torch.tensor([1,2,2,4]).unsqueeze(-1)
+#     end_pos = torch.tensor([3,4,5,6]).unsqueeze(-1)
+#     print(test(x, start_pos=start_pos, end_pos=end_pos))

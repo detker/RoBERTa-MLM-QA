@@ -27,7 +27,7 @@ accelerate launch train_qa_lora.py \
     --seed 42 \
     --max_no_of_checkpoints 3 \
     --pretrained_backbone "pretrained_huggingface" \
-#    --wandb \
+    --wandb \
 #    --loading_from_checkpoint
 #    --train_head_only \
 
