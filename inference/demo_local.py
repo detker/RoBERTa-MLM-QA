@@ -1,20 +1,11 @@
 import gradio as gr
-import requests
-import json
+from inference import Inference
 
-URL = "http://100.26.213.29:80/predict"
-
-def predict(question, context):
-    params = {
-        "question": question,
-        "context": context
-    }
-    response = requests.get(URL, params=params)
-    response_json = json.loads(response.text)
-    return response_json
+inference = Inference()
+inference.load_model()
 
 demo = gr.Interface(
-    fn=predict,
+    fn=inference.predict,
     inputs=[
         gr.Textbox(label='Question', placeholder='Enter your question here'),
         gr.Textbox(label='Context', placeholder='Enter the context here')
