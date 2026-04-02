@@ -57,4 +57,4 @@ pydantic==2.11.7
 gitdb==4.0.12
 GitPython==3.1.45
 wandb==0.21.3
-
+fastapi==0.135.3

@@ -10,11 +10,11 @@
 - [Introduction](#introduction)
 - [Setup](#setup)
 - [Training](#training)
-- [Notebooks](#notebooks)
+- [Inference and Demo](#-inference-and-demo)
 
 ## 🔎 Introduction
 
-This repository implements a RoBERTa-based model fine-tuned with LoRA (Low-Rank Adaptation) for question answering tasks. The project utilizes Hugging Face's `transformers` library and the `accelerate` framework for efficient training and evaluation. Project is also provided with RoBERTa for MLM training script in case user wants to train his very own base RoBERTa rather than using pretrained Hugging Face's weights.
+This repository implements a RoBERTa-based model fine-tuned with LoRA (Low-Rank Adaptation) for question answering tasks. The QA model is deployed as a containerized FastAPI service (Docker Hub + AWS ECS). The project uses Hugging Face's `transformers` library and the `accelerate` framework for efficient training and evaluation. It also includes a RoBERTa MLM training script in case you want to train your own base RoBERTa instead of using pretrained Hugging Face weights.
 
 ### Highlights
 - **Question Answering**: Designed for extractive QA tasks.
@@ -23,13 +23,15 @@ This repository implements a RoBERTa-based model fine-tuned with LoRA (Low-Rank 
 - **Customizable Training**: Easily modify hyperparameters and configurations.
 - **Pretrained Weights**: Leverages pretrained RoBERTa models for initialization.
 - **Distributed Data Parallelism**: Training can be performed on a multi-GPU setup using the `accelerate` library.
-- **Ready-to-Go Inference**: Supports loading model through Hugging Face's `transformers` library
+- **Deployed API**: QA inference is deployed with FastAPI, Docker, Docker Hub, and AWS ECS.
+- **Ready-to-Go Local Inference**: Supports loading model through Hugging Face's `transformers` library.
 
 ### 📂 Project Structure
 ```
 .
 ├── src/
-├── notebooks/
+├── app/
+├── inference/
 ├── wandb/
 ├── data/
 │   ├── roberta_data/
@@ -115,10 +117,10 @@ chmod +x train_mlm.sh
 Train the finetuned model for QA with LoRA using the `train_qa.sh` script. Adjust the parameters in the script as needed. Example:
 ```bash
 chmod +x train_qa.sh
-./train_mlm.sh
+./train_qa.sh
 ```
 
-Train script for QA as a parameter offers selecting very own trained weights from `train_mlm.sh` or loading Hugging Face's RoBERTa pretrained weights. 
+The QA training script supports both options: using your own backbone weights trained with `train_mlm.sh`, or loading pretrained Hugging Face RoBERTa weights.
 
 Training QA parameters include:
 
@@ -158,6 +160,41 @@ Training QA parameters include:
 
 Checkpoints are saved in the `{working_directory}/{experiment_name}/checkpoints/` directory at regular intervals.
 
-## 🧪 Notebooks 
+## 🌐 Inference and Demo
 
-Explore the `inference/` directory for a quick QA inference demo.
+This project supports both **local** and **non-local (deployed API)** inference.
+
+### 1) Local inference
+
+You can run QA locally by loading the model directly from Hugging Face with `AutoModel.from_pretrained(...)`. The weights are downloaded and cached automatically on first run.
+
+- Model repo: [detker/roberta-qa-125M](https://huggingface.co/detker/roberta-qa-125M)
+- Local demo assets: `inference/demo_local.py`, `inference/inference_qa_local.ipynb`
+
+This mode is useful for development, debugging, and offline experiments.
+
+### 2) Non-local inference (API)
+
+The repository also includes an inference service implemented in `app/main.py` using **FastAPI**.
+
+Available endpoints:
+- `GET /` — health check
+- `GET /predict` — QA inference endpoint
+
+`/predict` accepts:
+- `question` (query string)
+- `context` (query string)
+
+And returns:
+- `start_token_idx` - starting token index of the predicted answer span
+- `end_token_idx` - ending token index of the predicted answer span
+- `answer` - extracted answer text
+
+### Deployment process
+
+To make inference available remotely, the service was productionized as follows:
+
+1. Implemented FastAPI endpoints in `app/main.py`.
+2. Containerized the app with `app/Dockerfile`.
+3. Built and pushed the image to Docker Hub.
+4. Deployed the container to **AWS ECS**.
