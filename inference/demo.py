@@ -15,6 +15,7 @@ def predict(question, context):
 
 demo = gr.Interface(
     fn=predict,
+    fn=predict,
     inputs=[
         gr.Textbox(label='Question', placeholder='Enter your question here'),
         gr.Textbox(label='Context', placeholder='Enter the context here')
