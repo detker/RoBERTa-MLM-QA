@@ -14,7 +14,7 @@
 
 ## 🔎 Introduction
 
-This repository implements a RoBERTa-based model fine-tuned with LoRA (Low-Rank Adaptation) for question answering tasks. The QA model is deployed as a containerized FastAPI service (Docker Hub + AWS ECS). The project uses Hugging Face's `transformers` library and the `accelerate` framework for efficient training and evaluation. It also includes a RoBERTa MLM training script in case you want to train your own base RoBERTa instead of using pretrained Hugging Face weights.
+This repository implements a RoBERTa-based model fine-tuned with LoRA (Low-Rank Adaptation) for question answering tasks. The QA model is deployed as a containerized FastAPI service (Docker Hub + HuggingFace Spaces). The project uses Hugging Face's `transformers` library and the `accelerate` framework for efficient training and evaluation. It also includes a RoBERTa MLM training script in case you want to train your own base RoBERTa instead of using pretrained Hugging Face weights.
 
 ### Highlights
 - **Question Answering**: Designed for extractive QA tasks.
@@ -23,7 +23,7 @@ This repository implements a RoBERTa-based model fine-tuned with LoRA (Low-Rank 
 - **Customizable Training**: Easily modify hyperparameters and configurations.
 - **Pretrained Weights**: Leverages pretrained RoBERTa models for initialization.
 - **Distributed Data Parallelism**: Training can be performed on a multi-GPU setup using the `accelerate` library.
-- **Deployed API**: QA inference is deployed with FastAPI, Docker, Docker Hub, and AWS ECS.
+- **Deployed API**: QA inference is deployed with FastAPI, Docker, Docker Hub, and HuggingFace Spaces.
 - **Ready-to-Go Local Inference**: Supports loading model through Hugging Face's `transformers` library.
 
 ### 📂 Project Structure
@@ -197,4 +197,4 @@ To make inference available remotely, the service was productionized as follows:
 1. Implemented FastAPI endpoints in `app/main.py`.
 2. Containerized the app with `app/Dockerfile`.
 3. Built and pushed the image to Docker Hub.
-4. Deployed the container to **AWS ECS**.
+4. Deployed the container to **Hugging Face Spaces**.

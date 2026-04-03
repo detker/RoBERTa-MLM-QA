@@ -2,7 +2,7 @@ import gradio as gr
 import requests
 import json
 
-URL = "http://100.26.213.29:80/predict"
+URL = "https://detker-roberta-qa.hf.space/predict"
 
 def predict(question, context):
     params = {
