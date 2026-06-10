@@ -1,4 +1,4 @@
-accelerate launch train_base.py \
+uv run accelerate launch train_base.py \
     --experiment_name "RoBERTa_Pretraining" \
     --working_directory "work_dir" \
     --hf_model_name "FacebookAI/roberta-base" \
@@ -28,6 +28,7 @@ accelerate launch train_base.py \
     --adam_beta1 0.9 \
     --adam_beta2 0.98 \
     --adam_epsilon 1e-6 \
+    --seed 42 \
     --wandb
 
 

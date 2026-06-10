@@ -247,6 +247,13 @@ def add_arguments(parser: argparse.ArgumentParser):
     )
 
     parser.add_argument(
+        '--seed',
+        help='Seed for reproducible results',
+        default=42,
+        type=int
+    )
+
+    parser.add_argument(
         '--wandb',
         help='Flag to enable logging to wandb',
         default=False,

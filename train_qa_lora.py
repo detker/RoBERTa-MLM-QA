@@ -61,6 +61,11 @@ def add_arguments(parser: argparse.ArgumentParser):
                         default=False,
                         help='Whether to use LoRA.')
 
+    parser.add_argument('--use_qlora',
+                        action=argparse.BooleanOptionalAction,
+                        default=False,
+                        help='Whether to use QLoRA (4-bit quantized base weights). Takes precedence over --use_lora.')
+
     parser.add_argument('--train_head_only',
                         action=argparse.BooleanOptionalAction,
                         default=False,
@@ -99,6 +104,17 @@ def add_arguments(parser: argparse.ArgumentParser):
     parser.add_argument('--lora_exclude_modules',
                         type=lambda x: [s.strip() for s in x.split(',')],
                         help='Comma-separated list of modules to exclude from LoRA.')
+
+    parser.add_argument('--lora_quant_type',
+                        type=str,
+                        default='nf4',
+                        choices=['nf4', 'fp4'],
+                        help='QLoRA 4-bit quantization data type.')
+
+    parser.add_argument('--lora_compress_statistics',
+                        action=argparse.BooleanOptionalAction,
+                        default=True,
+                        help='QLoRA double quantization (quantize the quantization constants).')
 
     parser.add_argument('--max_grad_norm',
                         type=float,
@@ -221,14 +237,16 @@ def main():
     model = RobertaForQA(config)
 
     ## check if lora or head only, wrap model in lora
-    if not args.use_lora and args.train_head_only:
+    if not args.use_lora and not args.use_qlora and args.train_head_only:
         for name, param in model.named_parameters():
             if 'classifier' not in name:
                 param.requires_grad = False
 
-    if args.use_lora:
-        ## create config file
-        lora_config = LoRAConfig(**{k: v for k, v in args.__dict__.items() if 'lora_' in k})
+    if args.use_lora or args.use_qlora:
+        ## create config file (use_qlora drives the 4-bit quantized variant)
+        lora_config = LoRAConfig(use_qlora=args.use_qlora,
+                                 **{k: v for k, v in args.__dict__.items() if 'lora_' in k})
+        lora_config.lora_compute_dtype = {'fp16': torch.float16, 'bf16': torch.bfloat16}.get(accelerator.mixed_precision, torch.float32)
         model = LoRAModel(model, config=lora_config)
 
     ## move model to device
@@ -253,9 +271,11 @@ def main():
         path = os.path.join(args.working_directory, args.experiment_name, args.checkpoint_weights_dir)
 
         weights_type = None
-        if args.use_lora:
+        if args.use_qlora:
+            weights_type = 'qlora'
+        elif args.use_lora:
             weights_type = 'lora'
-        elif not args.use_lora and args.train_head_only:
+        elif args.train_head_only:
             weights_type = 'headonly'
         else:
             weights_type = 'fulltrain'
@@ -267,7 +287,6 @@ def main():
         checkpoint_path = os.path.join(path, checkpoints_sorted[-1])
         with accelerator.main_process_first():
             new_state_dict = model.state_dict()
-            # with safe_open('work_dir/LoRA_RoBERTa_QA/checkpoints/checkpoint_lora_1.safetensors', framework='pt') as f:
             with safe_open(checkpoint_path, framework='pt') as f:
                 for k in f.keys():
                     new_state_dict['model.' + k] = f.get_tensor(k)
@@ -283,7 +302,6 @@ def main():
     accelerator.print('TRAINING THE MODEL...')
 
     completed_train_steps = completed_epochs * len(trainloader)
-    completed_test_steps = completed_epochs * len(testloader)
 
     for epoch in range(completed_epochs, args.epochs):
         accelerator.print(f'Epoch: {epoch + 1}/{args.epochs}')
@@ -297,7 +315,6 @@ def main():
         for batch in trainloader:
             batch = {k: v.to(accelerator.device) for k, v in batch.items()}
             loss, start_logits, end_logits = model(**batch)
-            accelerator.print(loss)
             accelerator.backward(loss)
 
             accelerator.clip_grad_norm_([x for x in model.parameters() if x.requires_grad], args.max_grad_norm)
@@ -311,12 +328,15 @@ def main():
 
             loss_train.append(torch.mean(gathered_loss).item())
 
+            pbar.set_postfix(loss=np.array(loss_train).mean().item())
+            pbar.update(1)
+            completed_train_steps += 1
+
             if completed_train_steps % 10 == 0:
                 accelerator.log({"training_loss": np.array(loss_train).mean()},
                                 step=completed_train_steps)
-
-            pbar.update(1)
-            completed_train_steps += 1
+                loss_train = []
+            
 
         model.eval()
         accelerator.print('Evaluating model...')
@@ -329,17 +349,13 @@ def main():
 
             loss_test.append(torch.mean(gathered_loss).item())
 
-            if completed_test_steps % 10 == 0:
-                accelerator.log({"test_loss": np.array(loss_test).mean()},
-                                step=completed_test_steps)
-
-            completed_test_steps += 1
-
         epoch_train_loss = np.mean(loss_train)
         epoch_test_loss = np.mean(loss_test)
 
-        accelerator.print(f'Training Loss: {epoch_train_loss}')
-        accelerator.print(f'Testing Loss: {epoch_test_loss}')
+        accelerator.log({"test_loss": epoch_test_loss}, step=completed_train_steps)
+
+        accelerator.print(f'Training Loss: {epoch_train_loss.item()}')
+        accelerator.print(f'Testing Loss: {epoch_test_loss.item()}')
 
         accelerator.print('Saving checkpoint...')
         accelerator.wait_for_everyone()
@@ -349,13 +365,14 @@ def main():
         if accelerator.is_main_process:
             if not os.path.exists(path_to_save):
                 os.makedirs(path_to_save)
-            if args.use_lora:
+            if args.use_lora or args.use_qlora:
+                weights_label = 'qlora' if args.use_qlora else 'lora'
                 if epoch + 1 == args.epochs:
                     accelerator.unwrap_model(model).save_weights(
-                        os.path.join(path_to_save, f'checkpoint_merged_{epoch + 1}.safetensors'))
+                        os.path.join(path_to_save, f'checkpoint_merged_{weights_label}_{epoch + 1}.safetensors'))
                 accelerator.unwrap_model(model).save_weights(
-                    os.path.join(path_to_save, f'checkpoint_lora_{epoch + 1}.safetensors'), merge_weights=False)
-            elif not args.use_lora and args.train_head_only:
+                    os.path.join(path_to_save, f'checkpoint_{weights_label}_{epoch + 1}.safetensors'), merge_weights=False)
+            elif args.train_head_only:
                 save_file(accelerator.unwrap_model(model).state_dict(),
                           os.path.join(path_to_save, f'checkpoint_headonly_{epoch + 1}.safetensors'))
             else:

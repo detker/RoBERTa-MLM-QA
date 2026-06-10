@@ -13,8 +13,8 @@ huggingface_model = 'FacebookAI/roberta-base'
 
 tokenizer = RobertaTokenizerFast.from_pretrained(huggingface_model)
 
-wiki_dataset = load_dataset('wikipedia', '20220301.en', cache_dir=huggingface_cache_dir, trust_remote_code=True)
-books_dataset = load_dataset('bookcorpus/bookcorpus', cache_dir=huggingface_cache_dir, trust_remote_code=True)
+wiki_dataset = load_dataset('wikimedia/wikipedia', '20231101.en', cache_dir=huggingface_cache_dir)
+books_dataset = load_dataset('SamuelYang/bookcorpus', cache_dir=huggingface_cache_dir)
 
 wiki_dataset = wiki_dataset.select_columns(['text'])
 books_dataset = books_dataset.select_columns(['text'])
