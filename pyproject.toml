@@ -11,6 +11,7 @@ dependencies = [
     "fastapi==0.135.3",
     "gradio>=6.17.3",
     "huggingface-hub==0.34.4",
+    "matplotlib>=3.11.0",
     "numpy==2.2.6",
     "requests==2.32.5",
     "safetensors==0.6.2",
